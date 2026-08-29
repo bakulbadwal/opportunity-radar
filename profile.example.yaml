@@ -1,0 +1,42 @@
+# Opportunity Radar — personal profile (example).
+# Copy to profile.yaml and edit. Every number here IS the scoring model:
+# weights are printed with every run, and score breakdowns show exactly
+# which component contributed what. No hidden magic.
+
+# Theme keywords matched (case-insensitive substring) against title + themes.
+themes:
+  - ai
+  - agents
+  - machine learning
+  - llm
+  - automation
+  - productivity
+
+# Organizers you actively want to build with (matched against organizer/title).
+vendors:
+  - google
+  - aws
+  - amazon
+  - microsoft
+  - nvidia
+  - github
+  - anthropic
+  - openai
+
+# Only USD-denominated prizes count toward the floor (no exchange-rate guessing).
+prize_floor_usd: 25000
+
+weights:
+  vendor_bonus: 25.0        # organizer is on the vendor list
+  theme_match: 10.0         # per matching theme keyword...
+  theme_match_cap: 30.0     # ...capped here
+  prize_floor_bonus: 20.0   # USD prize >= prize_floor_usd
+  urgency_max: 20.0         # deadline today ~= +20, fades to 0 at the horizon
+  field_size_penalty: -15.0 # crowded field (see field_size.large_threshold)
+  featured_bonus: 5.0       # platform-featured listing
+
+deadline:
+  horizon_days: 45          # deadlines past this contribute ~0 urgency
+
+field_size:
+  large_threshold: 2000     # registrations at/above this trigger the penalty

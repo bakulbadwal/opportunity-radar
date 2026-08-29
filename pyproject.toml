@@ -1,0 +1,40 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "opportunity-radar"
+version = "0.1.0"
+description = "Async agent fleet that watches opportunity sources (hackathons, fellowships, grants) so you don't have to."
+readme = "README.md"
+requires-python = ">=3.11"
+license = { text = "Apache-2.0" }
+authors = [{ name = "Bakul Badwal" }]
+dependencies = [
+    "requests>=2.31",
+    "pyyaml>=6.0",
+    "python-dateutil>=2.8",
+]
+
+[project.optional-dependencies]
+# Agent mode: Google ADK + Gemini. NOT needed for the offline pipeline or tests.
+agent = [
+    "google-adk",
+    "google-genai",
+]
+# GCP state layer (FirestoreState). DRAFT / untested.
+gcp = [
+    "google-cloud-firestore",
+]
+dev = [
+    "pytest>=8.0",
+]
+
+[project.scripts]
+radar = "opportunity_radar.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

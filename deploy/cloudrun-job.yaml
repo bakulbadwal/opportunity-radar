@@ -1,0 +1,30 @@
+# DRAFT — NOT YET APPLIED to any GCP project. Cloud Run Job manifest for the
+# scheduled radar run. Replace PROJECT_ID / REGION before use; deploy commands
+# are in docs/DEPLOY.md (also DRAFT / not yet executed).
+apiVersion: run.googleapis.com/v1
+kind: Job
+metadata:
+  name: opportunity-radar
+  labels:
+    app: opportunity-radar
+spec:
+  template:
+    spec:
+      taskCount: 1
+      template:
+        spec:
+          maxRetries: 1
+          timeoutSeconds: 600
+          containers:
+            - name: radar
+              image: REGION-docker.pkg.dev/PROJECT_ID/opportunity-radar/radar:latest
+              env:
+                - name: GOOGLE_API_KEY
+                  valueFrom:
+                    secretKeyRef:
+                      name: gemini-api-key
+                      key: latest
+              resources:
+                limits:
+                  cpu: "1"
+                  memory: 512Mi
