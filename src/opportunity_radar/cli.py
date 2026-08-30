@@ -12,7 +12,7 @@ from __future__ import annotations
 
 import argparse
 import sys
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 
 from .brief import gemini_brief, render_brief
@@ -79,7 +79,7 @@ def cmd_scan(args: argparse.Namespace) -> int:
 
     profile_path = Path(args.profile) if args.profile else _find_default_profile()
     profile = load_profile(profile_path)
-    now = datetime.fromisoformat(args.now) if args.now else datetime.utcnow()
+    now = datetime.fromisoformat(args.now) if args.now else datetime.now(timezone.utc).replace(tzinfo=None)
     if getattr(args, "firestore", False):
         from .state import FirestoreState  # DRAFT: raises a clear error without [gcp]
 

@@ -12,7 +12,7 @@ The model never fabricates opportunities: everything flows from these tools.
 from __future__ import annotations
 
 import os
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 
 from .brief import render_brief
@@ -81,7 +81,7 @@ def get_new_since_last_run() -> dict:
     """
     if not _CONTEXT["items"]:
         return {"status": "error", "message": "Call scan_sources first."}
-    now = datetime.utcnow()
+    now = datetime.now(timezone.utc).replace(tzinfo=None)
     result = run_radar(
         sources=[_CachedSource(_CONTEXT["items"])],
         state=_state(),
@@ -113,7 +113,7 @@ def score_items() -> dict:
     if not _CONTEXT["items"]:
         return {"status": "error", "message": "Call scan_sources first."}
     profile = _profile()
-    now = _CONTEXT.get("now") or datetime.utcnow()
+    now = _CONTEXT.get("now") or datetime.now(timezone.utc).replace(tzinfo=None)
     scored = []
     for item in _CONTEXT["items"]:
         s = score_item(item, profile, now)
@@ -133,7 +133,7 @@ def write_brief() -> dict:
         dict: {"status", "markdown"}.
     """
     selected = _CONTEXT.get("selected", [])
-    now = _CONTEXT.get("now") or datetime.utcnow()
+    now = _CONTEXT.get("now") or datetime.now(timezone.utc).replace(tzinfo=None)
     markdown = render_brief(selected, now, format_weights(_profile()))
     return {"status": "success", "markdown": markdown}
 

@@ -41,7 +41,7 @@ DEVPOST_API_URL = "https://devpost.com/api/hackathons"
 
 _TAG_RE = re.compile(r"<[^>]+>")
 _USD_AMOUNT_RE = re.compile(r"\$\s*([\d][\d,]*(?:\.\d+)?)")
-_NON_USD_CURRENCY_RE = re.compile(r"[₹€£¥]|INR|EUR|GBP|JPY|CAD\$|A\$", re.IGNORECASE)
+_NON_USD_CURRENCY_RE = re.compile(r"[₹€£¥]|\b(?:INR|EUR|GBP|JPY|CAD|AUD|NZD|MXN|CHF|SGD|HKD)\b|(?:CAD|NZ|MXN|AU|HK|S)\$|\bC\$", re.IGNORECASE)
 
 
 def strip_html(text: str) -> str:

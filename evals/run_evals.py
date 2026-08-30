@@ -68,7 +68,7 @@ def main() -> int:
         f"got {top['id']} ({top['title']})",
     )
     selected_ids = {i["id"] for i in result.selected}
-    check("golden: crowded off-profile mini-hack not selected",
+    check("golden: off-profile mini-hack not selected",
           "devpost:21005" not in selected_ids)
 
     brief = render_brief(result.selected, NOW, format_weights(profile))
