@@ -69,8 +69,8 @@ scoring, and selection. The model *only* writes narrative from already-selected
 items — it cannot add, drop, or reprice an opportunity, and the gate proves it
 rather than promising it.
 
-**Google stack:** Gemini 3.5 Flash via `google-genai` · Google ADK agent with
-four custom function tools · Firestore for cross-run state.
+**Google stack:** Gemini 3.5 Flash via **Vertex AI** (`google-genai`) · Google ADK
+agent with four custom function tools · Firestore for cross-run state.
 
 ## Status
 
@@ -80,8 +80,8 @@ four custom function tools · Firestore for cross-run state.
 | Anti-invention gate + eval suite (incl. negative controls) | ✅ executable, exit 0/1, wired into CI |
 | CLI end-to-end (`radar scan`, `radar demo`) | ✅ |
 | Google ADK agent (`agent.py`, 4 function tools) | ✅ loads and runs under `adk run` (google-adk 2.8.0) |
-| Gemini 3.5 narration (`--gemini`) | ⏳ wired + gated by the same `validate_brief`; pending live-key run |
-| Firestore state (`--firestore`) | ⏳ wired; pending live run against a billed project |
+| Gemini 3.5 narration (`--gemini`) | ✅ live run via **Vertex AI**, passes the `validate_brief` gate on real model output |
+| Firestore state (`--firestore`) | ✅ live cross-run dedupe in Google Cloud (`opportunity_radar/default`) |
 | Cloud Run Jobs + Cloud Scheduler deploy | 📄 documented in [docs/DEPLOY.md](docs/DEPLOY.md), not executed |
 
 ## Spin-up — offline (no key, no network, no cloud)
@@ -117,9 +117,15 @@ python -m opportunity_radar scan --fixtures tests/fixtures/devpost_sample.json -
 
 # 2. Live sources + Gemini + Firestore state:
 gcloud config set project YOUR_PROJECT
-gcloud services enable firestore.googleapis.com
+gcloud services enable firestore.googleapis.com aiplatform.googleapis.com
 gcloud firestore databases create --location=nam5
 gcloud auth application-default login
+
+# Gemini through Vertex AI (uses ADC, no API key needed):
+export GOOGLE_GENAI_USE_VERTEXAI=true
+export GOOGLE_CLOUD_PROJECT=YOUR_PROJECT
+export GOOGLE_CLOUD_LOCATION=global
+
 python -m opportunity_radar scan --gemini --firestore
 
 # 3. The ADK agent (chains the four tools autonomously):
@@ -166,7 +172,7 @@ Both are deliberate scope choices for this version.
 
 - **Track:** The Taskmaster — a complete workflow that runs asynchronously in
   the background, not a chatbot.
-- **Google stack:** Gemini 3.5 Flash via the Gemini API (`google-genai`);
+- **Google stack:** Gemini 3.5 Flash via Vertex AI (`google-genai`);
   Google ADK agent with four custom function tools; Firestore for cross-run
   state. Cloud Run Jobs deployment is documented but not executed.
 - **New code:** everything in this repo was written from scratch during the
