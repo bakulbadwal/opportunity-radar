@@ -36,7 +36,18 @@ def _find_profile() -> str | None:
     return None
 
 
-def _state() -> LocalJSONState:
+def _state():
+    """State backend for the agent layer.
+
+    Set RADAR_FIRESTORE=true to give the ADK agent the same Firestore memory
+    the CLI's --firestore flag uses, so a run driven from the ADK web UI lands
+    in the same place as a run driven from the terminal. Defaults to the local
+    JSON file so the agent still works with no cloud and no credentials.
+    """
+    if os.environ.get("RADAR_FIRESTORE", "").strip().lower() in ("1", "true", "yes"):
+        from .state import FirestoreState  # lazy: keeps the [gcp] extra optional
+
+        return FirestoreState()
     return LocalJSONState(os.environ.get("RADAR_STATE", ".radar-state.json"))
 
 
