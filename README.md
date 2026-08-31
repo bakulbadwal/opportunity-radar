@@ -1,5 +1,7 @@
 # Opportunity Radar
 
+![Opportunity Radar](assets/hero.png)
+
 **An async background agent whose written output is provably grounded.**
 
 Agents write confident prose. The hard part isn't writing it — it's knowing it's
