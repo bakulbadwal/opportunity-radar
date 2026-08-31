@@ -21,3 +21,6 @@ brief.md
 
 # OS
 .DS_Store
+
+# ADK CLI scratch
+.adk/

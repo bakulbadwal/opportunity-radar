@@ -47,6 +47,14 @@ def test_parse_deadline_full_range():
     assert parse_deadline("Aug 25, 2026 - Sep 30, 2026") == datetime(2026, 9, 30)
 
 
+def test_parse_deadline_same_month_range_carries_month():
+    """"Aug 07 - 31, 2026" must not lose its deadline: the end of a same-month
+    range has no month of its own, so it is carried over from the start."""
+    assert parse_deadline("Aug 07 - 31, 2026") == datetime(2026, 8, 31)
+    assert parse_deadline("Jun 22 - Aug 31, 2026") == datetime(2026, 8, 31)
+    assert parse_deadline("Sep 01 - 09, 2026") == datetime(2026, 9, 9)
+
+
 def test_parse_deadline_garbage_returns_none():
     assert parse_deadline("TBD") is None
     assert parse_deadline("") is None

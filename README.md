@@ -1,73 +1,90 @@
 # Opportunity Radar
 
-> ## 🚧 DRAFT STATUS
-> Hackathon draft (Google "All Things Agentic", deadline **Aug 31, 2026**).
-> **Works and is tested, fully offline:** the entire deterministic pipeline —
-> fetch (via fixtures), normalize, dedupe against persistent state, transparent
-> scoring, selection, brief rendering, the anti-invention eval gate, and the
-> CLI end-to-end (38 pytest tests + a golden-scenario eval, no network, no
-> Google packages imported).
-> **Written but UNVERIFIED (labeled DRAFT in code):** the live Gemini call
-> (`--gemini`), the ADK agent (`agent.py` — never run against a live key),
-> `FirestoreState`, and the entire Cloud Run Jobs deploy
-> (`deploy/`, `docs/DEPLOY.md` — no command executed). The live Devpost
-> endpoint itself was verified 2026-08-24, but tests never hit it.
+**An async background agent whose written output is provably grounded.**
 
-**An async agent that watches opportunity sources so you don't have to.**
+Agents write confident prose. The hard part isn't writing it — it's knowing it's
+true. Opportunity Radar is a scheduled agent that watches opportunity sources
+(hackathons, fellowships, grants) and writes you a weekly brief — and a
+deterministic gate validates **every URL, dollar figure, and date** in that
+brief against the source data before you ever see it. If the model embellishes,
+the output is rejected, a deterministic renderer takes over, and the brief tells
+you it did.
+
+The watching is the demo. The gate is the point.
 
 ## The problem
 
-High-value, time-boxed opportunities — hackathons, fellowships, grants,
-competitions — are scattered across a dozen platforms and only matter until a
-deadline passes. Nobody wants to poll listing sites weekly; everybody has
-missed something they'd have won. The people this bites hardest (students,
-indie builders, researchers) are exactly the people without an assistant to
-watch for them.
+High-value, time-boxed opportunities are scattered across a dozen platforms and
+only matter until a deadline passes. Nobody wants to poll listing sites weekly;
+everybody has missed something they'd have won. The people this bites hardest —
+students, indie builders, researchers — are exactly the people without an
+assistant to watch for them.
+
+But a summarizing agent that quietly invents a prize amount or a deadline is
+worse than no agent at all, because you'll act on it. That's the failure mode
+this project is built around.
 
 ## The product
 
-Opportunity Radar is a small background agent fleet that runs on a schedule and
-sends you a short weekly brief of only the *new* opportunities that clear *your*
-bar:
+A small background agent that runs on a schedule and produces a short brief of
+only the *new* opportunities clearing *your* bar:
 
-1. **Fetch** sources (Devpost API today; the `Source` interface is one class
-   per new source).
+1. **Fetch** sources (Devpost API today; the `Source` interface is one class per
+   new source).
 2. **Normalize** into one schema — deterministic parsing, conservative on
-   currencies (non-USD prizes are never converted, just shown raw).
+   currencies (non-USD prizes are never converted, only shown raw).
 3. **Dedupe** against persistent state, so a weekly run only surfaces items
    you've never been shown.
 4. **Score** against your `profile.yaml` with fully transparent weights.
 5. **Select** the top N deterministically.
-6. **Narrate**: Gemini writes a short brief **from the selected items only**,
-   and the output must pass an anti-invention gate — every URL, dollar figure,
-   and date is checked against the input, or the deterministic renderer takes
+6. **Narrate**: Gemini writes the brief **from the selected items only**, and the
+   output must pass the anti-invention gate or the deterministic renderer takes
    over (and says so).
 
 ## Architecture
 
 ```mermaid
 flowchart LR
-    subgraph deterministic["Deterministic Python (tested offline)"]
+    subgraph deterministic["Deterministic Python — owns every fact"]
         S[Devpost API /<br/>FixtureSource] --> N[normalize]
         N --> D[dedupe vs state]
         D --> SC[score vs profile.yaml<br/>transparent breakdown]
         SC --> SEL[select top N]
-        ST[(State:<br/>LocalJSONState ✅<br/>FirestoreState DRAFT)] <--> D
+        ST[(State:<br/>Firestore or<br/>LocalJSONState)] <--> D
     end
-    subgraph model["Model layer (narrative only)"]
-        SEL --> G[Gemini writes brief<br/>from selected items ONLY]
+    subgraph model["Model layer — narrative only"]
+        SEL --> G[Gemini 3.5 writes brief<br/>from selected items ONLY]
         G --> GATE{anti-invention gate:<br/>every URL / $ / date<br/>must exist in input}
         GATE -- pass --> B[weekly brief]
         GATE -- fail --> F[deterministic renderer<br/>+ fallback notice] --> B
     end
-    SCHED[Cloud Scheduler → Cloud Run Job<br/>DRAFT, not deployed] -.-> S
+    subgraph adk["Google ADK agent layer"]
+        A[root_agent] --> T[4 function tools:<br/>scan_sources · get_new_since_last_run<br/>score_items · write_brief]
+    end
+    T -.calls.-> deterministic
 ```
 
-**Discipline:** deterministic Python owns fetching, parsing, dedupe, scoring,
-and selection. The model *only* writes narrative from already-selected items —
-it cannot add, drop, or reprice an opportunity, and the gate proves it.
+**The discipline:** deterministic Python owns fetching, parsing, dedupe,
+scoring, and selection. The model *only* writes narrative from already-selected
+items — it cannot add, drop, or reprice an opportunity, and the gate proves it
+rather than promising it.
 
-## Quickstart — offline (no key, no network)
+**Google stack:** Gemini 3.5 Flash via `google-genai` · Google ADK agent with
+four custom function tools · Firestore for cross-run state.
+
+## Status
+
+| Component | State |
+|---|---|
+| Deterministic pipeline (fetch → normalize → dedupe → score → select) | ✅ 39 tests, all offline |
+| Anti-invention gate + eval suite (incl. negative controls) | ✅ executable, exit 0/1, wired into CI |
+| CLI end-to-end (`radar scan`, `radar demo`) | ✅ |
+| Google ADK agent (`agent.py`, 4 function tools) | ✅ loads and runs under `adk run` (google-adk 2.8.0) |
+| Gemini 3.5 narration (`--gemini`) | ⏳ wired + gated by the same `validate_brief`; pending live-key run |
+| Firestore state (`--firestore`) | ⏳ wired; pending live run against a billed project |
+| Cloud Run Jobs + Cloud Scheduler deploy | 📄 documented in [docs/DEPLOY.md](docs/DEPLOY.md), not executed |
+
+## Spin-up — offline (no key, no network, no cloud)
 
 ```bash
 python3 -m venv .venv
@@ -82,31 +99,36 @@ python3 -m venv .venv
   --now 2026-08-25T12:00:00 \
   --out brief.md
 
-.venv/bin/python -m pytest -q          # 38 tests, all offline
-.venv/bin/python evals/run_evals.py    # golden scenario + gate self-test
+.venv/bin/python -m pytest -q          # 39 tests, all offline
+.venv/bin/python evals/run_evals.py    # golden scenario + gate negative controls
 ```
 
 Run `scan` twice against the same `--state` file and the second run reports
 `new=0` — that's the dedupe doing its job.
 
-## Agent mode (DRAFT — needs a Gemini API key)
+## Spin-up — full Google stack
 
 ```bash
-pip install -e ".[agent]"
-cp .env.example .env   # put your GOOGLE_API_KEY in it
+pip install -e ".[agent,gcp]"
+cp .env.example .env        # add your GOOGLE_API_KEY (from aistudio.google.com/apikey)
 
-# Gemini-narrated brief (gated; falls back deterministically on any failure):
+# 1. Gemini-narrated brief, gated:
 python -m opportunity_radar scan --fixtures tests/fixtures/devpost_sample.json --gemini
 
-# Google ADK agent (custom tools: scan_sources, get_new_since_last_run,
-# score_items, write_brief):
-adk run src/opportunity_radar
-adk web --port 8000
+# 2. Live sources + Gemini + Firestore state:
+gcloud config set project YOUR_PROJECT
+gcloud services enable firestore.googleapis.com
+gcloud firestore databases create --location=nam5
+gcloud auth application-default login
+python -m opportunity_radar scan --gemini --firestore
+
+# 3. The ADK agent (chains the four tools autonomously):
+adk run src/opportunity_radar "Run a radar scan and write me this week's brief."
+adk web --port 8000         # dev UI
 ```
 
-The scheduled production shape is a **Cloud Run Job** triggered by Cloud
-Scheduler with Firestore state — written, documented in
-[docs/DEPLOY.md](docs/DEPLOY.md), **not yet executed** (DRAFT).
+State lands in Firestore collection `opportunity_radar`, document `default`,
+with fields `seen_ids` and `last_run` — that's the agent's memory between runs.
 
 ## Transparent scoring
 
@@ -127,26 +149,32 @@ hidden magic; changing a number in the YAML *is* changing the model.
 `evals/run_evals.py` (exit code 0/1, wired into CI):
 
 1. **Golden scenario** — frozen clock + checked-in fixture must produce the
-   known-good selection, and the rendered brief must pass the anti-invention
-   gate.
+   known-good selection, and the rendered brief must pass the gate.
 2. **Negative controls** — briefs with a planted fake URL, fake dollar figure,
    and fake deadline must each be *caught*. A gate that can't catch a planted
    lie is not a gate.
 
-The same `validate_brief` function gates real Gemini output at runtime.
+The same `validate_brief` function gates real Gemini output at runtime, so the
+eval suite tests the production path, not a copy of it.
+
+**Known limits, stated plainly:** the gate checks ISO-format dates (the prompt
+mandates ISO output), and validates facts as a set rather than per-sentence —
+so it catches invented facts, not facts correctly quoted against the wrong item.
+Both are deliberate scope choices for this version.
 
 ## Hackathon statement
 
-- **Track:** The Taskmaster (background / async agents) — the whole point is
-  an agent that runs while you don't.
-- **Google stack:** Google ADK agent with four custom function tools; Gemini
-  via `google-genai`; Cloud Run Jobs + Cloud Scheduler + Firestore (deploy
-  layer DRAFT).
+- **Track:** The Taskmaster — a complete workflow that runs asynchronously in
+  the background, not a chatbot.
+- **Google stack:** Gemini 3.5 Flash via the Gemini API (`google-genai`);
+  Google ADK agent with four custom function tools; Firestore for cross-run
+  state. Cloud Run Jobs deployment is documented but not executed.
 - **New code:** everything in this repo was written from scratch during the
-  hackathon window (Aug 2026). The concept traces to the author's July 2026
-  personal spec (a private cron-script version exists); no code was reused.
-- **AI assistance:** built with AI pair-assistance (Claude); all architecture
-  decisions, verification, and the final deploy are the author's.
+  submission window (Aug 2026). The concept traces to the author's July 2026
+  personal spec; no code was reused.
+- **AI assistance:** built with AI pair-assistance (Claude), which the rules
+  permit; the running agent is Gemini. All architecture decisions and
+  verification are the author's.
 
 ## License
 

@@ -40,6 +40,7 @@ from dateutil import parser as dateparser
 DEVPOST_API_URL = "https://devpost.com/api/hackathons"
 
 _TAG_RE = re.compile(r"<[^>]+>")
+_MONTH_WORD_RE = re.compile(r"[A-Za-z]{3,}")
 _USD_AMOUNT_RE = re.compile(r"\$\s*([\d][\d,]*(?:\.\d+)?)")
 _NON_USD_CURRENCY_RE = re.compile(r"[₹€£¥]|\b(?:INR|EUR|GBP|JPY|CAD|AUD|NZD|MXN|CHF|SGD|HKD)\b|(?:CAD|NZ|MXN|AU|HK|S)\$|\bC\$", re.IGNORECASE)
 
@@ -75,12 +76,24 @@ def parse_deadline(submission_period_dates: str) -> datetime | None:
     """Parse the *end* of a Devpost submission period, conservatively.
 
     Handles "Aug 20 - Sep 05, 2026" and "Aug 25, 2026 - Sep 30, 2026".
-    Returns None rather than guessing when the string doesn't parse.
+
+    Same-month ranges omit the month on the end ("Aug 07 - 31, 2026"), which
+    would otherwise leave "31, 2026" — unparseable, so the deadline silently
+    vanished and the item lost its urgency score. Carry the month over from the
+    start of the range in that case. Still returns None rather than guessing
+    when the string genuinely doesn't parse.
     """
     text = (submission_period_dates or "").strip()
     if not text:
         return None
-    end_part = text.split(" - ")[-1].strip() if " - " in text else text
+    if " - " in text:
+        start_part, end_part = (p.strip() for p in text.rsplit(" - ", 1))
+        if not _MONTH_WORD_RE.search(end_part):
+            start_month = _MONTH_WORD_RE.search(start_part)
+            if start_month:
+                end_part = f"{start_month.group(0)} {end_part}"
+    else:
+        end_part = text
     try:
         return dateparser.parse(end_part, fuzzy=False)
     except (ValueError, OverflowError):
