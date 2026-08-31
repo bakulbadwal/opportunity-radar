@@ -45,6 +45,11 @@ only the *new* opportunities clearing *your* bar:
 
 ## Architecture
 
+![Architecture](assets/architecture.png)
+
+<details>
+<summary>Same diagram as mermaid source</summary>
+
 ```mermaid
 flowchart LR
     subgraph deterministic["Deterministic Python — owns every fact"]
@@ -65,6 +70,8 @@ flowchart LR
     end
     T -.calls.-> deterministic
 ```
+
+</details>
 
 **The discipline:** deterministic Python owns fetching, parsing, dedupe,
 scoring, and selection. The model *only* writes narrative from already-selected
